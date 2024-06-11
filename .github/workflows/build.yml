@@ -1,0 +1,60 @@
+name: 🛠️ Building AutoHelpers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - feature/*
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: 🛠️ Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 👨‍💻 Check-out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 👨‍🔧 Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: 🛠️ Build code
+        run: dotnet build --configuration Release
+
+  publish:
+    name: 📦 Publish nuget library
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag'
+    needs: [build]
+    steps:
+      - name: 👨‍💻 Check-out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 👨‍🔧 Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: 🛠️ Build code
+        run: dotnet build --configuration Release -p:Version=${{ github.ref_name }} -p:GitSha=${{ github.sha }}
+
+      - name: 📦 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget
+          path: nugets/*.nupkg
+
+      - name: ✈️ Push Nuget
+        run: dotnet nuget push nugets/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
