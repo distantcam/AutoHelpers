@@ -1,9 +1,9 @@
-﻿using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Testing;
+using Microsoft.CodeAnalysis.Diagnostics;
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 #if ROSLYN_4
 using FluentAssertions;
@@ -32,9 +32,9 @@ internal static class Helpers
         ));
 #endif
 
-
     public static async Task<CSharpCompilation> Compile<TAttribute>(
         IEnumerable<string> codes,
+        string targetFramework = "net8.0",
         string netCoreVersion = "8.0.6",
         string assemblyName = "RoslynTests",
         IEnumerable<string>? preprocessorSymbols = default,
@@ -44,9 +44,9 @@ internal static class Helpers
         extraReferences ??= [];
 
         var references = await new ReferenceAssemblies(
-            "net8.0",
+            targetFramework,
             new("Microsoft.NETCore.App.Ref", netCoreVersion),
-            Path.Combine("ref", "net8.0"))
+            Path.Combine("ref", targetFramework))
             .ResolveAsync(null, CancellationToken.None);
 
         var attributeReference = MetadataReference.CreateFromFile(typeof(TAttribute).Assembly.Location);
@@ -64,23 +64,11 @@ internal static class Helpers
 
     private static CSharpParseOptions CreateParseOptions(IEnumerable<string> preprocessorSymbols)
     {
-#if ROSLYN_3_11
         return CSharpParseOptions.Default
-            .WithPreprocessorSymbols(ImmutableArray.Create(["ROSLYN_3", "ROSLYN_3_11", .. preprocessorSymbols]))
-            .WithLanguageVersion(LanguageVersion.Preview);
-#elif ROSLYN_4_4
-        return CSharpParseOptions.Default
-            .WithPreprocessorSymbols(ImmutableArray.Create(["ROSLYN_4", "ROSLYN_4_4", .. preprocessorSymbols]));
-#elif ROSLYN_4_6
-        return CSharpParseOptions.Default
-            .WithPreprocessorSymbols(ImmutableArray.Create(["ROSLYN_4", "ROSLYN_4_6", .. preprocessorSymbols]));
-#elif ROSLYN_4_8
-        return CSharpParseOptions.Default
-            .WithPreprocessorSymbols(ImmutableArray.Create(["ROSLYN_4", "ROSLYN_4_8", .. preprocessorSymbols]));
-#elif ROSLYN_4_10
-        return CSharpParseOptions.Default
-            .WithPreprocessorSymbols(ImmutableArray.Create(["ROSLYN_4", "ROSLYN_4_10", .. preprocessorSymbols]));
+#if ROSLYN_3
+            .WithLanguageVersion(LanguageVersion.Preview)
 #endif
+            .WithPreprocessorSymbols(preprocessorSymbols);
     }
 
     private class TestAnalyzerConfigOptionsProvider(IEnumerable<(string, string)> options) : AnalyzerConfigOptionsProvider
