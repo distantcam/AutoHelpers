@@ -40,26 +40,52 @@ internal static class Helpers
         IEnumerable<string>? preprocessorSymbols = default,
         IEnumerable<MetadataReference>? extraReferences = default)
     {
-        preprocessorSymbols ??= [];
         extraReferences ??= [];
+        var attributeReference = MetadataReference.CreateFromFile(typeof(TAttribute).Assembly.Location);
+        var netCoreRef = await GetNetCoreRef(targetFramework, netCoreVersion);
+        return Compile(codes, assemblyName, preprocessorSymbols ?? [], [attributeReference, .. netCoreRef, .. extraReferences]);
+    }
 
-        var references = await new ReferenceAssemblies(
+    public static async Task<CSharpCompilation> Compile(
+        IEnumerable<string> codes,
+        string targetFramework = "net8.0",
+        string netCoreVersion = "8.0.6",
+        string assemblyName = "RoslynTests",
+        IEnumerable<string>? preprocessorSymbols = default,
+        IEnumerable<MetadataReference>? extraReferences = default)
+    {
+        extraReferences ??= [];
+        var netCoreRef = await GetNetCoreRef(targetFramework, netCoreVersion);
+        return Compile(codes, assemblyName, preprocessorSymbols ?? [], [.. netCoreRef, .. extraReferences]);
+    }
+
+    public static CSharpCompilation Compile(
+        IEnumerable<string> codes,
+        string assemblyName,
+        IEnumerable<string>? preprocessorSymbols,
+        IEnumerable<MetadataReference>? references)
+    {
+        preprocessorSymbols ??= [];
+        references ??= [];
+        var options = CreateParseOptions(preprocessorSymbols);
+        return CSharpCompilation.Create(
+            assemblyName,
+            codes.Select(c => CSharpSyntaxTree.ParseText(c, options)),
+            references,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary
+            ));
+    }
+
+    private static async Task<ImmutableArray<MetadataReference>> GetNetCoreRef(
+        string targetFramework,
+        string netCoreVersion)
+    {
+        return await new ReferenceAssemblies(
             targetFramework,
             new("Microsoft.NETCore.App.Ref", netCoreVersion),
             Path.Combine("ref", targetFramework))
             .ResolveAsync(null, CancellationToken.None);
-
-        var attributeReference = MetadataReference.CreateFromFile(typeof(TAttribute).Assembly.Location);
-
-        var options = CreateParseOptions(preprocessorSymbols);
-
-        return CSharpCompilation.Create(
-            assemblyName,
-            codes.Select(c => CSharpSyntaxTree.ParseText(c, options)),
-            [attributeReference, .. references, .. extraReferences],
-            new CSharpCompilationOptions(
-                OutputKind.DynamicallyLinkedLibrary
-            ));
     }
 
     private static CSharpParseOptions CreateParseOptions(IEnumerable<string> preprocessorSymbols)
